@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+    <title>AR Home Removation & Construction</title>
+  {% load static %}
+  </head>
+
+  <body>
+    <img src="{% static 'myapp/header.png' %}" alt="S" width="100%" height="220">
+
+    <div class="container">
+      <div class="row">
+        <div class="col-sm">
+          <p><b>BILLED TO</b></p>  
+          <p>{{name}}<br>{{address}}, {{province}}<br>{{country}} {{postalcode}}</p>
+        </div>
+        <div class="col-sm">
+          <p><b>Amandeep Singh</b></p>  
+          <p>AR Home Renovation & Construction Inc. C/O<br>411 Popular Avenue, Summerside<br>Canada C1N 2B9</p>
+        </div>
+      </div>
+    </div>
+
+  </body>
+
+
+</html>
