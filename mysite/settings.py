@@ -16,7 +16,7 @@ SECRET_KEY = 'django-insecure-e#ov2dd3i228hlk82p!(1dl4)wur!1e!v(+@8_de&w!(tkl2mv
 DEBUG = False
 
 # ALLOWED_HOSTS = ['arhomerenovation-990f5bcf0d20.herokuapp.com']
-ALLOWED_HOSTS = ['']
+ALLOWED_HOSTS = ['https://arhomeinvoicegenerator.vercel.app', 'localhost', '127.0.0.1']
 # ALLOWED_HOSTS = ['arhomeinvoice.pythonanywhere.com']
 
 
