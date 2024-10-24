@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
+import io  # Import io module
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -70,9 +71,9 @@ def index_two(request):
             country = customer_info.get("country")
             postalcode = customer_info.get("postalcode", "")[:3] + " " + customer_info.get("postalcode", "")[3:]
 
-            outfilename = os.path.join(BASE_DIR, 'myapp/static/myapp/final_invoice.pdf')
+            buffer = io.BytesIO()  # Create a bytes buffer
 
-            can = canvas.Canvas(outfilename)
+            can = canvas.Canvas(buffer)
 
             # Header
             file_name = os.path.join(BASE_DIR, 'myapp/static/myapp/header.png')
@@ -155,6 +156,8 @@ def index_two(request):
             can.showPage()
             can.save()
 
-            return FileResponse(open(outfilename, 'rb'), as_attachment=True)
+            buffer.seek(0)  # Move to the beginning of the BytesIO buffer
+
+            return FileResponse(buffer, as_attachment=True, filename='invoice.pdf')  # Return PDF directly without saving
 
     return render(request, "index_two.html")
