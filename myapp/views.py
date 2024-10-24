@@ -47,11 +47,11 @@ def index_two(request):
 
     if 'additem' in request.POST:
 
-        try:
-            pickle_in = open("invoice.pickle","rb")
-            items_dict = pickle.load(pickle_in)
-        except:
-            pass
+        # try:
+        #     pickle_in = open("invoice.pickle","rb")
+        #     items_dict = pickle.load(pickle_in)
+        # except:
+        #     pass
 
         description = request.POST.get("description")
         quantityorarea = request.POST.get("quantityorarea")
@@ -66,9 +66,9 @@ def index_two(request):
             'quantityorarea':quantityorarea,
             'unitprice':unitprice}
 
-            pickle_out = open("invoice.pickle","wb")
-            pickle.dump(items_dict, pickle_out)
-            pickle_out.close()
+            # pickle_out = open("invoice.pickle","wb")
+            # pickle.dump(items_dict, pickle_out)
+            # pickle_out.close()
 
             print(items_dict)
 
@@ -78,8 +78,8 @@ def index_two(request):
     elif 'generateinvoice' in request.POST:
 
 
-        pickle_in = open("invoice.pickle","rb")
-        items_dict = pickle.load(pickle_in)
+        # pickle_in = open("invoice.pickle","rb")
+        # items_dict = pickle.load(pickle_in)
 
         name = request.session["name"]
         address = request.session["address"]
