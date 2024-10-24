@@ -27,11 +27,11 @@ def index(request):
         country = request.POST.get("country")
         postalcode = request.POST.get("postalcode")
 
-        request.session["name"] = name
-        request.session["address"] = address
-        request.session["province"] = province
-        request.session["country"] = country
-        request.session["postalcode"] = postalcode
+        # request.session["name"] = name
+        # request.session["address"] = address
+        # request.session["province"] = province
+        # request.session["country"] = country
+        # request.session["postalcode"] = postalcode
 
         # pickle_out = open("invoice.pickle","wb")
         # pickle.dump({}, pickle_out)
@@ -58,9 +58,9 @@ def index_two(request):
         unitprice = request.POST.get("unitprice")
 
         if(len(description) != 0 and len(quantityorarea) !=0 and len(unitprice) != 0):
-            request.session["description"] = description
-            request.session["quantityorarea"] = quantityorarea
-            request.session["unitprice"] = unitprice
+            # request.session["description"] = description
+            # request.session["quantityorarea"] = quantityorarea
+            # request.session["unitprice"] = unitprice
 
             items_dict["item"+str(len(items_dict))] = {'description':description,
             'quantityorarea':quantityorarea,
@@ -81,12 +81,12 @@ def index_two(request):
         # pickle_in = open("invoice.pickle","rb")
         # items_dict = pickle.load(pickle_in)
 
-        name = request.session["name"]
-        address = request.session["address"]
-        province = request.session["province"]
-        country = request.session["country"]
-        postalcode = request.session["postalcode"]
-        postalcode = postalcode[:3]+" "+postalcode[3:]
+        # name = request.session["name"]
+        # address = request.session["address"]
+        # province = request.session["province"]
+        # country = request.session["country"]
+        # postalcode = request.session["postalcode"]
+        # postalcode = postalcode[:3]+" "+postalcode[3:]
 
         outfilename = os.path.join(BASE_DIR, 'myapp/static/myapp/final_invoice.pdf')
 
