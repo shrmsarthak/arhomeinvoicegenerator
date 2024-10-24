@@ -33,9 +33,9 @@ def index(request):
         request.session["country"] = country
         request.session["postalcode"] = postalcode
 
-        pickle_out = open("invoice.pickle","wb")
-        pickle.dump({}, pickle_out)
-        pickle_out.close()
+        # pickle_out = open("invoice.pickle","wb")
+        # pickle.dump({}, pickle_out)
+        # pickle_out.close()
 
         return redirect('index_two')
 
