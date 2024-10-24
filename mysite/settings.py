@@ -13,16 +13,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-e#ov2dd3i228hlk82p!(1dl4)wur!1e!v(+@8_de&w!(tkl2mv'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 # ALLOWED_HOSTS = ['arhomerenovation-990f5bcf0d20.herokuapp.com']
-ALLOWED_HOSTS = ['https://arhomeinvoicegenerator.vercel.app', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['*']
 # ALLOWED_HOSTS = ['arhomeinvoice.pythonanywhere.com']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -34,6 +35,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -114,13 +116,14 @@ USE_TZ = True
 #    os.path.join(BASE_DIR, 'myapp/static/')
 # ]
 
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-]
+# STATICFILES_DIRS = [
+#     os.path.join(BASE_DIR, 'static'),
+# ]
 
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'mysite/static'), ]
 STATIC_ROOT = os.path.join(BASE_DIR,'staticfiles')
-# STATICFILES_DIRS = [os.path.join(BASE_DIR, 'staticfiles'), ]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
