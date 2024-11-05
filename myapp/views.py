@@ -6,17 +6,14 @@ from random import randint
 from datetime import datetime
 import os
 from django.conf import settings
-from django.http import HttpResponse, FileResponse
+from django.http import FileResponse
 import io  # Import io module
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Initialize global variables to store data in lists
-invoice_items = []
-customer_info = {}
-
 def index(request):
-    global customer_info
+    # Clear session data on visiting the homepage
+    request.session.flush()
 
     if request.method == "POST":
         name = request.POST.get('name')
@@ -25,8 +22,8 @@ def index(request):
         country = request.POST.get("country")
         postalcode = request.POST.get("postalcode")
 
-        # Store customer information in a dictionary
-        customer_info = {
+        # Store customer information in the session
+        request.session['customer_info'] = {
             "name": name,
             "address": address,
             "province": province,
@@ -39,8 +36,6 @@ def index(request):
     return render(request, "index.html")
 
 def index_two(request):
-    global invoice_items, customer_info
-
     if request.method == "POST":
 
         if 'additem' in request.POST:
@@ -49,22 +44,28 @@ def index_two(request):
             unitprice = request.POST.get("unitprice")
 
             if len(description) != 0 and len(quantityorarea) != 0 and len(unitprice) != 0:
-                # Add item to the list of invoice items
+                # Retrieve current items or create an empty list if not present
+                invoice_items = request.session.get('invoice_items', [])
                 invoice_items.append({
                     'description': description,
                     'quantityorarea': quantityorarea,
                     'unitprice': unitprice
                 })
 
-                print(invoice_items)
+                # Save updated list back to session
+                request.session['invoice_items'] = invoice_items
 
             else:
                 return render(request, 'index_two.html', {"mymessage": "Please enter data in the given fields.", "Flag": "True"})
 
         elif 'generateinvoice' in request.POST:
+            customer_info = request.session.get('customer_info', {})
+            invoice_items = request.session.get('invoice_items', [])
+
             if not invoice_items or not customer_info:
                 return render(request, 'index_two.html', {"mymessage": "No items or customer info available to generate invoice.", "Flag": "True"})
 
+            # Retrieve customer info from session
             name = customer_info.get("name")
             address = customer_info.get("address")
             province = customer_info.get("province")
