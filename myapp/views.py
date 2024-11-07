@@ -117,7 +117,7 @@ def index_two(request):
                 description = item['description']
                 quantity = item['quantityorarea']
                 price = item['unitprice']
-                total = int(quantity) * int(price)
+                total = round(float(quantity) * float(price), 2)  # Round to 2 decimal places
 
                 subtotal += total
 
