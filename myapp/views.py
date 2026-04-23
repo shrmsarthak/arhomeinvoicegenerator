@@ -1,166 +1,202 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from reportlab.pdfgen import canvas
 from pathlib import Path
 from random import randint
 from datetime import datetime
 import os
-from django.http import FileResponse
+from django.http import FileResponse, JsonResponse
 import io
+import json
+import re
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Initialize global variables to store data temporarily
-invoice_items = []
-customer_info = {}
-
-def index(request):
-    global customer_info, invoice_items
+def invoice_app(request):
+    """Single page invoice generator with Invoice/Estimate modes"""
     
-    # Clear customer info and invoice items when reaching the homepage
-    customer_info = {}
-    invoice_items = []
-
     if request.method == "POST":
-        name = request.POST.get('name')
-        address = request.POST.get("address")
-        province = request.POST.get("province")
-        country = request.POST.get("country")
-        postalcode = request.POST.get("postalcode")
-
-        # Store customer information in a dictionary
+        # Get customer info
         customer_info = {
-            "name": name,
-            "address": address,
-            "province": province,
-            "country": country,
-            "postalcode": postalcode
+            "name": request.POST.get('name'),
+            "address": request.POST.get('address'),
+            "province": request.POST.get('province'),
+            "country": request.POST.get('country'),
+            "postalcode": request.POST.get('postalcode'),
         }
-
-        return redirect('index_two')
-
-    return render(request, "index.html")
-
-def index_two(request):
-    global invoice_items, customer_info
-
-    if request.method == "POST":
-
-        if 'additem' in request.POST:
-            description = request.POST.get("description")
-            quantityorarea = request.POST.get("quantityorarea")
-            unitprice = request.POST.get("unitprice")
-
-            if len(description) != 0 and len(quantityorarea) != 0 and len(unitprice) != 0:
-                # Add item to the list of invoice items
-                invoice_items.append({
-                    'description': description,
-                    'quantityorarea': quantityorarea,
-                    'unitprice': unitprice
-                })
-
-                print(invoice_items)
-
+        
+        # Get invoice items from JSON string with error handling
+        items_json = request.POST.get('items', '[]')
+        
+        # Fix: Handle empty or invalid JSON
+        try:
+            if not items_json or items_json.strip() == '' or items_json == '[]':
+                invoice_items = []
             else:
-                return render(request, 'index_two.html', {"mymessage": "Please enter data in the given fields.", "Flag": "True"})
+                invoice_items = json.loads(items_json)
+        except json.JSONDecodeError:
+            invoice_items = []
+        
+        # Get document type (Invoice or Estimate)
+        doc_type = request.POST.get('doc_type', 'invoice')
+        
+        # Get invoice/estimate number
+        doc_number = request.POST.get('doc_number', str(randint(1, 100000)))
+        
+        # Validate - Return proper error message
+        if not customer_info.get('name'):
+            return JsonResponse({'error': 'Customer name is required'}, status=400)
+        
+        if not invoice_items or len(invoice_items) == 0:
+            return JsonResponse({'error': 'Please add at least one item'}, status=400)
+        
+        # Validate each item has required fields
+        for i, item in enumerate(invoice_items):
+            if not item.get('description'):
+                return JsonResponse({'error': f'Description required for item {i+1}'}, status=400)
+            if not item.get('quantityorarea') or float(item.get('quantityorarea', 0)) <= 0:
+                return JsonResponse({'error': f'Valid quantity required for item {i+1}'}, status=400)
+            if not item.get('unitprice') or float(item.get('unitprice', 0)) <= 0:
+                return JsonResponse({'error': f'Valid price required for item {i+1}'}, status=400)
+        
+        # Generate PDF
+        buffer = generate_pdf(customer_info, invoice_items, doc_type, doc_number)
+        
+        # Create filename
+        safe_name = re.sub(r'[^\w\s-]', '', customer_info.get('name', 'customer'))[:30]
+        safe_name = re.sub(r'[-\s]+', '-', safe_name)
+        date_str = datetime.today().strftime('%Y%m%d')
+        filename = f"{safe_name}_{doc_type}_{date_str}.pdf"
+        
+        return FileResponse(buffer, as_attachment=True, filename=filename)
+    
+    return render(request, "invoice_app.html")
 
-        elif 'generateinvoice' in request.POST:
-            if not invoice_items or not customer_info:
-                return render(request, 'index_two.html', {"mymessage": "No items or customer info available to generate invoice.", "Flag": "True"})
-
-            # Retrieve customer info from dictionary
-            name = customer_info.get("name")
-            address = customer_info.get("address")
-            province = customer_info.get("province")
-            country = customer_info.get("country")
-            postalcode = customer_info.get("postalcode", "")[:3] + " " + customer_info.get("postalcode", "")[3:]
-
-            buffer = io.BytesIO()  # Create a bytes buffer
-
-            can = canvas.Canvas(buffer)
-
-            # Header
-            file_name = os.path.join(BASE_DIR, 'myapp/static/myapp/header.png')
-            can.drawImage(file_name, 0, 570, width=570, preserveAspectRatio=True, mask='auto')
-            can.setFont("Helvetica", 10)
-
-            # Invoice details
-            can.drawString(25, 720, "Date: " + datetime.today().strftime('%Y-%m-%d'))
-            can.drawString(25, 710, "Invoice No. " + str(randint(1, 100000)))
-
-            # Customer info
-            can.drawString(25, 680, "BILLED TO")
-            can.drawString(25, 660, name)
-            can.drawString(25, 650, address + ", " + province)
-            can.drawString(25, 640, country + " " + postalcode)
-
-            can.line(570, 610, 25, 610)
-
-            # Owner info
-            can.setFont("Helvetica", 10)
-            can.drawString(345, 700, "Amandeep Singh")
-            can.drawString(345, 680, "AR Home Renovation & Construction Inc. C/O")
-            can.drawString(345, 670, "411 Popular Avenue, Summerside")
-            can.drawString(345, 660, "Canada C1N 2B9")
-
-            # Item details header
-            can.drawString(25, 595, "Description")
-            can.drawString(225, 595, "Quantity or Area")
-            can.drawString(400, 595, "Price")
-            can.drawString(520, 595, "Total")
-            can.line(570, 585, 25, 585)
-
-            base = 595
-            current_base = 0
-            subtotal = 0
-
-            for i, item in enumerate(invoice_items):
-                description = item['description']
-                quantity = item['quantityorarea']
-                price = item['unitprice']
-                total = round(float(quantity) * float(price), 2)  # Round to 2 decimal places
-
-                subtotal += total
-
-                # Drawing items
-                can.drawString(25, base - (i + 1) * 25, description)
-                can.drawString(260, base - (i + 1) * 25, quantity)
-                can.drawString(405, base - (i + 1) * 25, "$" + price)
-                can.drawString(525, base - (i + 1) * 25, "$" + str(total))
-
-                if i == len(invoice_items) - 1:
-                    current_base = base - (i + 1) * 25
-
-            can.line(570, current_base - 12, 25, current_base - 12)
-
-            # Subtotal
-            can.drawString(405, current_base - 30, "Sub Total")
-            can.drawString(525, current_base - 30, "$" + str(subtotal))
-
-            # Total after tax
-            can.drawString(405, current_base - 50, "Tax (15%)")
-            can.drawString(525, current_base - 50, "$" + str(subtotal * 0.15))
-
-            can.line(570, current_base - 60, 400, current_base - 60)
-
-            can.drawString(405, current_base - 80, "Total")
-            can.drawString(525, current_base - 80, "$" + str(subtotal + (subtotal * 0.15)))
-
-            # Contact info
-            can.drawString(25, 175, "CONTACT INFORMATION")
-            can.drawString(25, 150, "Phone : 647-622-4449")
-            can.drawString(25, 140, "Email: Arhomerenovation1@gmail.com")
-            can.drawString(25, 130, "Website: https://arhomerenovation.ca/")
-
-            can.drawString(450, 130, "HST No. 732134002RT001")
-
-            footer_filename = os.path.join(BASE_DIR, 'myapp/static/myapp/footer.png')
-            can.drawImage(footer_filename, 0, -130, width=570, preserveAspectRatio=True, mask='auto')
-
-            can.showPage()
-            can.save()
-
-            buffer.seek(0)  # Move to the beginning of the BytesIO buffer
-
-            return FileResponse(buffer, as_attachment=True, filename='invoice.pdf')  # Return PDF directly without saving
-
-    return render(request, "index_two.html")
+def generate_pdf(customer_info, invoice_items, doc_type, doc_number):
+    """Generate PDF invoice or estimate with appropriate heading"""
+    buffer = io.BytesIO()
+    can = canvas.Canvas(buffer)
+    
+    # Header
+    file_name = os.path.join(BASE_DIR, 'myapp/static/myapp/header.png')
+    if os.path.exists(file_name):
+        can.drawImage(file_name, 0, 570, width=570, preserveAspectRatio=True, mask='auto')
+    
+    can.setFont("Helvetica-Bold", 14)
+    
+    # Set heading based on document type
+    if doc_type == 'estimate':
+        heading = "    ESTIMATE"
+        subheading = "    This is not an invoice. Valid for 30 days."
+        # Add left margin by increasing X coordinate (move right)
+        heading_x = 250  # Changed from 250 to 280 (30px left margin)
+        subheading_x = 220  # Changed from 220 to 250 (30px left margin)
+    else:
+        heading = "TAX INVOICE"
+        subheading = ""
+        heading_x = 250  # Keep original position for invoice
+        subheading_x = 220
+    
+    # Draw heading
+    can.drawString(heading_x, 740, heading)
+    if subheading:
+        can.setFont("Helvetica", 8)
+        can.drawString(subheading_x, 725, subheading)
+        can.setFont("Helvetica", 10)
+    
+    # Document details
+    can.setFont("Helvetica", 10)
+    can.drawString(25, 720, "Date: " + datetime.today().strftime('%Y-%m-%d'))
+    
+    if doc_type == 'invoice':
+        can.drawString(25, 710, f"Invoice No. {doc_number}")
+    else:
+        can.drawString(25, 710, f"Estimate No. {doc_number}")
+    
+    # Customer info
+    can.drawString(25, 680, "BILLED TO")
+    can.drawString(25, 660, customer_info.get("name", ""))
+    address = customer_info.get("address", "")
+    province = customer_info.get("province", "")
+    can.drawString(25, 650, address + ", " + province)
+    
+    country = customer_info.get("country", "")
+    postalcode = customer_info.get("postalcode", "")
+    if len(postalcode) > 3:
+        postalcode = postalcode[:3] + " " + postalcode[3:]
+    can.drawString(25, 640, country + " " + postalcode)
+    
+    can.line(570, 610, 25, 610)
+    
+    # Owner info
+    can.setFont("Helvetica", 10)
+    can.drawString(345, 700, "Amandeep Singh")
+    can.drawString(345, 680, "AR Home Renovation & Construction Inc. C/O")
+    can.drawString(345, 670, "411 Popular Avenue, Summerside")
+    can.drawString(345, 660, "Canada C1N 2B9")
+    
+    # Item details header
+    can.drawString(25, 595, "Description")
+    can.drawString(225, 595, "Quantity or Area")
+    can.drawString(400, 595, "Price")
+    can.drawString(520, 595, "Total")
+    can.line(570, 585, 25, 585)
+    
+    base = 595
+    current_base = 0
+    subtotal = 0
+    
+    for i, item in enumerate(invoice_items):
+        description = item.get('description', '')
+        quantity = item.get('quantityorarea', 0)
+        price = item.get('unitprice', 0)
+        total = round(float(quantity) * float(price), 2)
+        subtotal += total
+        
+        # Drawing items
+        can.drawString(25, base - (i + 1) * 25, description[:40])
+        can.drawString(260, base - (i + 1) * 25, str(quantity))
+        can.drawString(405, base - (i + 1) * 25, "$" + str(price))
+        can.drawString(525, base - (i + 1) * 25, "$" + str(total))
+        
+        if i == len(invoice_items) - 1:
+            current_base = base - (i + 1) * 25
+    
+    can.line(570, current_base - 12, 25, current_base - 12)
+    
+    # Subtotal
+    can.drawString(405, current_base - 30, "Sub Total")
+    can.drawString(525, current_base - 30, "$" + str(subtotal))
+    
+    # Total after tax
+    can.drawString(405, current_base - 50, "Tax (15%)")
+    can.drawString(525, current_base - 50, "$" + str(round(subtotal * 0.15, 2)))
+    
+    can.line(570, current_base - 60, 400, current_base - 60)
+    
+    can.drawString(405, current_base - 80, "Total")
+    total_amount = subtotal + (subtotal * 0.15)
+    can.drawString(525, current_base - 80, "$" + str(round(total_amount, 2)))
+    
+    # Contact info
+    can.drawString(25, 175, "CONTACT INFORMATION")
+    can.drawString(25, 150, "Phone : 647-622-4449")
+    can.drawString(25, 140, "Email: Arhomerenovation1@gmail.com")
+    can.drawString(25, 130, "Website: https://arhomerenovation.ca/")
+    
+    can.drawString(450, 130, "HST No. 732134002RT001")
+    
+    footer_filename = os.path.join(BASE_DIR, 'myapp/static/myapp/footer.png')
+    if os.path.exists(footer_filename):
+        can.drawImage(footer_filename, 0, -130, width=570, preserveAspectRatio=True, mask='auto')
+    
+    # Add validity note for estimates
+    if doc_type == 'estimate':
+        can.setFont("Helvetica-Oblique", 8)
+        can.drawString(25, 100, "This is a price estimate only. Actual invoice may vary based on final work completed.")
+        can.drawString(25, 90, "Please contact us for any changes or questions regarding this estimate.")
+    
+    can.showPage()
+    can.save()
+    
+    buffer.seek(0)
+    return buffer
