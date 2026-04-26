@@ -90,13 +90,12 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes
     if doc_type == 'estimate':
         heading = "    ESTIMATE"
         subheading = "    This is not an invoice. Valid for 30 days."
-        # Add left margin by increasing X coordinate (move right)
-        heading_x = 250  # Changed from 250 to 280 (30px left margin)
-        subheading_x = 220  # Changed from 220 to 250 (30px left margin)
+        heading_x = 250
+        subheading_x = 220
     else:
         heading = "TAX INVOICE"
         subheading = ""
-        heading_x = 250  # Keep original position for invoice
+        heading_x = 250
         subheading_x = 220
     
     # Draw heading
@@ -150,35 +149,37 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes
     
     for i, item in enumerate(invoice_items):
         description = item.get('description', '')
-        quantity = item.get('quantityorarea', 0)
-        price = item.get('unitprice', 0)
-        total = round(float(quantity) * float(price), 2)
+        quantity = float(item.get('quantityorarea', 0))
+        price = float(item.get('unitprice', 0))
+        total = round(quantity * price, 2)
         subtotal += total
         
-        # Drawing items
+        # Drawing items with proper 2-decimal formatting
         can.drawString(25, base - (i + 1) * 25, description[:40])
-        can.drawString(260, base - (i + 1) * 25, str(quantity))
-        can.drawString(405, base - (i + 1) * 25, "$" + str(price))
-        can.drawString(525, base - (i + 1) * 25, "$" + str(total))
+        can.drawString(260, base - (i + 1) * 25, f"{quantity:.2f}")
+        can.drawString(405, base - (i + 1) * 25, f"${price:.2f}")
+        can.drawString(525, base - (i + 1) * 25, f"${total:.2f}")
         
         if i == len(invoice_items) - 1:
             current_base = base - (i + 1) * 25
     
     can.line(570, current_base - 12, 25, current_base - 12)
     
-    # Subtotal
+    # Subtotal with 2 decimals
     can.drawString(405, current_base - 30, "Sub Total")
-    can.drawString(525, current_base - 30, "$" + str(subtotal))
+    can.drawString(525, current_base - 30, f"${subtotal:.2f}")
     
-    # Total after tax
+    # Tax (15%) with 2 decimals
+    tax_amount = round(subtotal * 0.15, 2)
     can.drawString(405, current_base - 50, "Tax (15%)")
-    can.drawString(525, current_base - 50, "$" + str(round(subtotal * 0.15, 2)))
+    can.drawString(525, current_base - 50, f"${tax_amount:.2f}")
     
     can.line(570, current_base - 60, 400, current_base - 60)
     
+    # Total with 2 decimals
+    total_amount = round(subtotal + tax_amount, 2)
     can.drawString(405, current_base - 80, "Total")
-    total_amount = subtotal + (subtotal * 0.15)
-    can.drawString(525, current_base - 80, "$" + str(round(total_amount, 2)))
+    can.drawString(525, current_base - 80, f"${total_amount:.2f}")
     
     # Terms & Conditions - 50px below total, left aligned (x=25)
     if terms_notes and terms_notes.strip():
@@ -213,11 +214,12 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes
         # Draw each line of terms
         line_y = terms_y_position - 15
         for line in lines:
-            if line_y > 50:  # Don't go below page bottom
+            if line_y > 50:
                 can.drawString(25, line_y, line)
                 line_y -= 12
     
     # Contact info
+    can.setFont("Helvetica", 10)
     can.drawString(25, 175, "CONTACT INFORMATION")
     can.drawString(25, 150, "Phone : 647-622-4449")
     can.drawString(25, 140, "Email: Arhomerenovation1@gmail.com")
