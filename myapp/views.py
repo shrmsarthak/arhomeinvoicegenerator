@@ -24,6 +24,9 @@ def invoice_app(request):
             "postalcode": request.POST.get('postalcode'),
         }
         
+        # Get terms & conditions / notes
+        terms_notes = request.POST.get('terms_notes', '')
+        
         # Get invoice items from JSON string with error handling
         items_json = request.POST.get('items', '[]')
         
@@ -59,7 +62,7 @@ def invoice_app(request):
                 return JsonResponse({'error': f'Valid price required for item {i+1}'}, status=400)
         
         # Generate PDF
-        buffer = generate_pdf(customer_info, invoice_items, doc_type, doc_number)
+        buffer = generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes)
         
         # Create filename
         safe_name = re.sub(r'[^\w\s-]', '', customer_info.get('name', 'customer'))[:30]
@@ -71,7 +74,7 @@ def invoice_app(request):
     
     return render(request, "invoice_app.html")
 
-def generate_pdf(customer_info, invoice_items, doc_type, doc_number):
+def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes):
     """Generate PDF invoice or estimate with appropriate heading"""
     buffer = io.BytesIO()
     can = canvas.Canvas(buffer)
@@ -176,6 +179,43 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number):
     can.drawString(405, current_base - 80, "Total")
     total_amount = subtotal + (subtotal * 0.15)
     can.drawString(525, current_base - 80, "$" + str(round(total_amount, 2)))
+    
+    # Terms & Conditions - 50px below total, left aligned (x=25)
+    if terms_notes and terms_notes.strip():
+        # Position 50px below the total (current_base - 130)
+        terms_y_position = current_base - 130
+        
+        # Draw "Terms & Conditions" header
+        can.setFont("Helvetica-Bold", 9)
+        can.drawString(25, terms_y_position, "TERMS & CONDITIONS:")
+        
+        # Draw the terms content with word wrapping
+        can.setFont("Helvetica", 8)
+        terms_text = terms_notes.strip()
+        
+        # Word wrap the terms (max ~80 characters per line)
+        lines = []
+        words = terms_text.split()
+        current_line = ""
+        
+        for word in words:
+            test_line = current_line + " " + word if current_line else word
+            if len(test_line) <= 80:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        
+        if current_line:
+            lines.append(current_line)
+        
+        # Draw each line of terms
+        line_y = terms_y_position - 15
+        for line in lines:
+            if line_y > 50:  # Don't go below page bottom
+                can.drawString(25, line_y, line)
+                line_y -= 12
     
     # Contact info
     can.drawString(25, 175, "CONTACT INFORMATION")
