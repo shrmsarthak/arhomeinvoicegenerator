@@ -1,18 +1,22 @@
 from django.shortcuts import render
 from reportlab.pdfgen import canvas
 from pathlib import Path
-from random import randint
 from datetime import datetime
 import os
 from django.http import FileResponse, JsonResponse
 import io
 import json
 import re
+from .utils.invoice_counter import get_next_invoice_number, get_current_invoice_number, set_invoice_number
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 def invoice_app(request):
     """Single page invoice generator with Invoice/Estimate modes"""
+    
+    # Get current invoice number to display in the form
+    current_inv_number = get_current_invoice_number()
+    next_inv_number = current_inv_number + 1 if current_inv_number else 12915
     
     if request.method == "POST":
         # Get customer info
@@ -43,7 +47,31 @@ def invoice_app(request):
         doc_type = request.POST.get('doc_type', 'invoice')
         
         # Get invoice/estimate number
-        doc_number = request.POST.get('doc_number', str(randint(1, 100000)))
+        doc_number_raw = request.POST.get('doc_number', '')
+        
+        # Handle document number based on type and user input
+        if doc_type == 'invoice':
+            if doc_number_raw and doc_number_raw.strip():
+                # User provided custom number
+                doc_number = doc_number_raw.strip()
+                # If user manually entered a number and it's greater than current, update counter
+                try:
+                    num_value = int(doc_number)
+                    current_max = get_current_invoice_number()
+                    if num_value > current_max:
+                        set_invoice_number(num_value)
+                except ValueError:
+                    # If not a pure number, just use as is
+                    pass
+            else:
+                # Auto-increment for invoices
+                doc_number = str(get_next_invoice_number())
+        else:
+            # For estimates, use timestamp or user provided
+            if doc_number_raw and doc_number_raw.strip():
+                doc_number = doc_number_raw.strip()
+            else:
+                doc_number = f"EST-{datetime.today().strftime('%Y%m%d')}"
         
         # Validate - Return proper error message
         if not customer_info.get('name'):
@@ -72,7 +100,10 @@ def invoice_app(request):
         
         return FileResponse(buffer, as_attachment=True, filename=filename)
     
-    return render(request, "invoice_app.html")
+    return render(request, "invoice_app.html", {
+        'current_inv_number': current_inv_number,
+        'next_inv_number': next_inv_number
+    })
 
 def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes):
     """Generate PDF invoice or estimate with appropriate heading"""
@@ -109,6 +140,7 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes
     can.setFont("Helvetica", 10)
     can.drawString(25, 720, "Date: " + datetime.today().strftime('%Y-%m-%d'))
     
+    # Show just the number without any prefix
     if doc_type == 'invoice':
         can.drawString(25, 710, f"Invoice No. {doc_number}")
     else:
@@ -242,3 +274,27 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes
     
     buffer.seek(0)
     return buffer
+
+
+# Admin endpoint to view/reset invoice counter
+def admin_invoice_counter(request):
+    """Admin view to check and reset invoice counter"""
+    if request.method == "POST":
+        action = request.POST.get('action')
+        if action == 'reset':
+            reset_to = int(request.POST.get('reset_to', 12914))
+            from .utils.invoice_counter import reset_invoice_number
+            reset_invoice_number(reset_to)
+            return JsonResponse({'status': 'success', 'message': f'Counter reset to {reset_to}'})
+        elif action == 'set':
+            new_number = int(request.POST.get('new_number', 12915))
+            from .utils.invoice_counter import set_invoice_number
+            set_invoice_number(new_number)
+            return JsonResponse({'status': 'success', 'message': f'Counter set to {new_number}'})
+    
+    current = get_current_invoice_number()
+    return JsonResponse({
+        'current_invoice_number': current,
+        'next_invoice_number': current + 1,
+        'starting_number': 12915
+    })
