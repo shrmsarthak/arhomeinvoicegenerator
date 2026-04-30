@@ -28,6 +28,16 @@ def invoice_app(request):
             "postalcode": request.POST.get('postalcode'),
         }
         
+        # Get invoice date from form (use today as fallback)
+        invoice_date_str = request.POST.get('invoice_date', '')
+        if invoice_date_str:
+            try:
+                invoice_date = datetime.strptime(invoice_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                invoice_date = datetime.today().date()
+        else:
+            invoice_date = datetime.today().date()
+        
         # Get terms & conditions / notes
         terms_notes = request.POST.get('terms_notes', '')
         
@@ -89,8 +99,8 @@ def invoice_app(request):
             if not item.get('unitprice') or float(item.get('unitprice', 0)) <= 0:
                 return JsonResponse({'error': f'Valid price required for item {i+1}'}, status=400)
         
-        # Generate PDF
-        buffer = generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes)
+        # Generate PDF with invoice date
+        buffer = generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes, invoice_date)
         
         # Create filename
         safe_name = re.sub(r'[^\w\s-]', '', customer_info.get('name', 'customer'))[:30]
@@ -105,10 +115,14 @@ def invoice_app(request):
         'next_inv_number': next_inv_number
     })
 
-def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes):
+def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes, invoice_date=None):
     """Generate PDF invoice or estimate with appropriate heading"""
     buffer = io.BytesIO()
     can = canvas.Canvas(buffer)
+    
+    # Use provided date or today as fallback
+    if invoice_date is None:
+        invoice_date = datetime.today().date()
     
     # Header
     file_name = os.path.join(BASE_DIR, 'myapp/static/myapp/header.png')
@@ -136,9 +150,9 @@ def generate_pdf(customer_info, invoice_items, doc_type, doc_number, terms_notes
         can.drawString(subheading_x, 725, subheading)
         can.setFont("Helvetica", 10)
     
-    # Document details
+    # Document details with user-selected date
     can.setFont("Helvetica", 10)
-    can.drawString(25, 720, "Date: " + datetime.today().strftime('%Y-%m-%d'))
+    can.drawString(25, 720, "Date: " + invoice_date.strftime('%Y-%m-%d'))
     
     # Show just the number without any prefix
     if doc_type == 'invoice':
